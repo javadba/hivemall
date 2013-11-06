@@ -1,14 +1,14 @@
-/**
+/*
  * Hivemall: Hive scalable Machine Learning Library
  *
  * Copyright (C) 2013
  *   National Institute of Advanced Industrial Science and Technology (AIST)
  *   Registration Number: H25PRO-1520
- *   
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -24,6 +24,7 @@ import hivemall.common.FeatureValue;
 import hivemall.common.HivemallConstants;
 import hivemall.common.Margin;
 import hivemall.common.PredictionResult;
+import hivemall.common.WeightValue;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -58,7 +59,7 @@ public abstract class MulticlassOnlineClassifierUDTF extends GenericUDTF {
     protected float bias;
     protected Object biasKey;
 
-    protected Map<Object, Map<Object, FloatWritable>> label2FeatureWeight;
+    protected Map<Object, Map<Object, WeightValue>> label2FeatureWeight;
 
     @Override
     public StructObjectInspector initialize(ObjectInspector[] argOIs) throws UDFArgumentException {
@@ -108,7 +109,7 @@ public abstract class MulticlassOnlineClassifierUDTF extends GenericUDTF {
         fieldNames.add("weight");
         fieldOIs.add(PrimitiveObjectInspectorFactory.writableFloatObjectInspector);
 
-        this.label2FeatureWeight = new HashMap<Object, Map<Object, FloatWritable>>(64);
+        this.label2FeatureWeight = new HashMap<Object, Map<Object, WeightValue>>(64);
 
         return ObjectInspectorFactory.getStandardStructObjectInspector(fieldNames, fieldOIs);
     }
@@ -116,7 +117,7 @@ public abstract class MulticlassOnlineClassifierUDTF extends GenericUDTF {
     protected Options getOptions() {
         Options opts = new Options();
         opts.addOption("fh", "fhash", false, "Enable feature hashing (only used when feature is TEXT type) [default: off]");
-        opts.addOption("b", "bias", true, "Bias clause. Use 0.0 to disable. [default 1.0]");
+        opts.addOption("b", "bias", true, "Bias clause. [default 0.0 (disable)]");
         return opts;
     }
 
@@ -179,9 +180,9 @@ public abstract class MulticlassOnlineClassifierUDTF extends GenericUDTF {
         float maxScore = Float.MIN_VALUE;
         Object maxScoredLabel = null;
 
-        for(Map.Entry<Object, Map<Object, FloatWritable>> label2map : label2FeatureWeight.entrySet()) {// for each class
+        for(Map.Entry<Object, Map<Object, WeightValue>> label2map : label2FeatureWeight.entrySet()) {// for each class
             Object label = label2map.getKey();
-            Map<Object, FloatWritable> weights = label2map.getValue();
+            Map<Object, WeightValue> weights = label2map.getValue();
             float score = calcScore(weights, features);
             if(maxScoredLabel == null || score > maxScore) {
                 maxScore = score;
@@ -197,9 +198,9 @@ public abstract class MulticlassOnlineClassifierUDTF extends GenericUDTF {
         Object maxAnotherLabel = null;
         float maxAnotherScore = 0.f;
 
-        for(Map.Entry<Object, Map<Object, FloatWritable>> label2map : label2FeatureWeight.entrySet()) {// for each class
+        for(Map.Entry<Object, Map<Object, WeightValue>> label2map : label2FeatureWeight.entrySet()) {// for each class
             Object label = label2map.getKey();
-            Map<Object, FloatWritable> weights = label2map.getValue();
+            Map<Object, WeightValue> weights = label2map.getValue();
             float score = calcScore(weights, features);
             if(label.equals(actual_label)) {
                 correctScore = score;
@@ -210,14 +211,54 @@ public abstract class MulticlassOnlineClassifierUDTF extends GenericUDTF {
                 }
             }
         }
-
         return new Margin(correctScore, maxAnotherLabel, maxAnotherScore);
+    }
+
+    protected Margin getMarginAndVariance(final List<?> features, final Object actual_label) {
+        return getMarginAndVariance(features, actual_label, false);
+    }
+
+    protected Margin getMarginAndVariance(final List<?> features, final Object actual_label, boolean nonZeroVariance) {
+        float correctScore = 0.f;
+        float correctVariance = 0.f;
+        Object maxAnotherLabel = null;
+        float maxAnotherScore = 0.f;
+        float maxAnotherVariance = 0.f;
+
+        if(nonZeroVariance && label2FeatureWeight.isEmpty()) {// for initial call
+            float var = 2.f * calcVariance(features);
+            return new Margin(correctScore, maxAnotherLabel, maxAnotherScore).variance(var);
+        }
+
+        for(Map.Entry<Object, Map<Object, WeightValue>> label2map : label2FeatureWeight.entrySet()) {// for each class
+            Object label = label2map.getKey();
+            Map<Object, WeightValue> weights = label2map.getValue();
+            PredictionResult predicted = calcScoreAndVariance(weights, features);
+            float score = predicted.getScore();
+
+            if(label.equals(actual_label)) {
+                correctScore = score;
+                correctVariance = predicted.getVariance();
+            } else {
+                if(maxAnotherLabel == null || score > maxAnotherScore) {
+                    maxAnotherLabel = label;
+                    maxAnotherScore = score;
+                    maxAnotherVariance = predicted.getVariance();
+                }
+            }
+        }
+
+        float var = correctVariance + maxAnotherVariance;
+        return new Margin(correctScore, maxAnotherLabel, maxAnotherScore).variance(var);
     }
 
     protected final float squaredNorm(final List<?> features) {
         float squared_norm = 0.f;
 
         for(Object f : features) {// a += w[i] * x[i]
+            if(f == null) {
+                continue;
+            }
             final float v;
             if(parseX) {
                 FeatureValue fv = FeatureValue.parse(f, feature_hashing);
@@ -235,13 +276,16 @@ public abstract class MulticlassOnlineClassifierUDTF extends GenericUDTF {
         return squared_norm;
     }
 
-    protected final float calcScore(final Map<Object, FloatWritable> weights, final List<?> features) {
+    protected final float calcScore(final Map<Object, WeightValue> weights, final List<?> features) {
         final ObjectInspector featureInspector = featureListOI.getListElementObjectInspector();
         final boolean parseX = this.parseX;
 
         float score = 0.f;
 
         for(Object f : features) {// a += w[i] * x[i]
+            if(f == null) {
+                continue;
+            }
             final Object k;
             final float v;
             if(parseX) {
@@ -252,20 +296,89 @@ public abstract class MulticlassOnlineClassifierUDTF extends GenericUDTF {
                 k = ObjectInspectorUtils.copyToStandardObject(f, featureInspector);
                 v = 1.f;
             }
-            FloatWritable old_w = weights.get(k);
+            WeightValue old_w = weights.get(k);
             if(old_w != null) {
-                score += (old_w.get() * v);
+                score += (old_w.getValue() * v);
             }
         }
 
         if(bias != 0.f) {
-            FloatWritable biasWeight = weights.get(biasKey);
+            WeightValue biasWeight = weights.get(biasKey);
             if(biasWeight != null) {
-                score += biasWeight.get();
+                score += biasWeight.getValue();
             }
         }
 
         return score;
+    }
+
+    protected final float calcVariance(final List<?> features) {
+        final boolean parseX = this.parseX;
+
+        float variance = 0.f;
+
+        for(Object f : features) {// a += w[i] * x[i]
+            if(f == null) {
+                continue;
+            }
+            final float v;
+            if(parseX) {
+                FeatureValue fv = FeatureValue.parse(f, feature_hashing);
+                v = fv.getValue();
+            } else {
+                v = 1.f;
+            }
+            variance += v * v;
+        }
+
+        if(bias != 0.f) {
+            variance += bias * bias;
+        }
+
+        return variance;
+    }
+
+    protected final PredictionResult calcScoreAndVariance(final Map<Object, WeightValue> weights, final List<?> features) {
+        final ObjectInspector featureInspector = featureListOI.getListElementObjectInspector();
+        final boolean parseX = this.parseX;
+
+        float score = 0.f;
+        float variance = 0.f;
+
+        for(Object f : features) {// a += w[i] * x[i]
+            if(f == null) {
+                continue;
+            }
+            final Object k;
+            final float v;
+            if(parseX) {
+                FeatureValue fv = FeatureValue.parse(f, feature_hashing);
+                k = fv.getFeature();
+                v = fv.getValue();
+            } else {
+                k = ObjectInspectorUtils.copyToStandardObject(f, featureInspector);
+                v = 1.f;
+            }
+            WeightValue old_w = weights.get(k);
+            if(old_w == null) {
+                variance += (1.f * v * v);
+            } else {
+                score += (old_w.getValue() * v);
+                variance += (old_w.getCovariance() * v * v);
+            }
+        }
+
+        if(bias != 0.f) {
+            WeightValue biasWeight = weights.get(biasKey);
+            if(biasWeight == null) {
+                variance += (1.f * bias * bias);
+            } else {
+                score += (biasWeight.getValue() * bias);
+                variance += (biasWeight.getCovariance() * bias * bias);
+            }
+        }
+
+        return new PredictionResult(score).variance(variance);
     }
 
     protected void update(List<?> features, float coeff, Object actual_label, Object missed_label) {
@@ -275,16 +388,16 @@ public abstract class MulticlassOnlineClassifierUDTF extends GenericUDTF {
                     + actual_label);
         }
 
-        Map<Object, FloatWritable> weightsToAdd = label2FeatureWeight.get(actual_label);
+        Map<Object, WeightValue> weightsToAdd = label2FeatureWeight.get(actual_label);
         if(weightsToAdd == null) {
-            weightsToAdd = new HashMap<Object, FloatWritable>(8192);
+            weightsToAdd = new HashMap<Object, WeightValue>(8192);
             label2FeatureWeight.put(actual_label, weightsToAdd);
         }
-        Map<Object, FloatWritable> weightsToSub = null;
+        Map<Object, WeightValue> weightsToSub = null;
         if(missed_label != null) {
             weightsToSub = label2FeatureWeight.get(missed_label);
             if(weightsToSub == null) {
-                weightsToSub = new HashMap<Object, FloatWritable>(8192);
+                weightsToSub = new HashMap<Object, WeightValue>(8192);
                 label2FeatureWeight.put(missed_label, weightsToSub);
             }
         }
@@ -292,6 +405,9 @@ public abstract class MulticlassOnlineClassifierUDTF extends GenericUDTF {
         final ObjectInspector featureInspector = featureListOI.getListElementObjectInspector();
 
         for(Object f : features) {// w[f] += y * x[f]
+            if(f == null) {
+                continue;
+            }
             final Object k;
             final float v;
             if(parseX) {
@@ -302,30 +418,30 @@ public abstract class MulticlassOnlineClassifierUDTF extends GenericUDTF {
                 k = ObjectInspectorUtils.copyToStandardObject(f, featureInspector);
                 v = 1.f;
             }
-            FloatWritable old_trueclass_w = weightsToAdd.get(k);
-            float add_w = (old_trueclass_w == null) ? coeff * v : old_trueclass_w.get()
+            WeightValue old_trueclass_w = weightsToAdd.get(k);
+            float add_w = (old_trueclass_w == null) ? coeff * v : old_trueclass_w.getValue()
                     + (coeff * v);
-            weightsToAdd.put(k, new FloatWritable(add_w));
+            weightsToAdd.put(k, new WeightValue(add_w));
 
             if(weightsToSub != null) {
-                FloatWritable old_falseclass_w = weightsToSub.get(k);
-                float sub_w = (old_falseclass_w == null) ? -(coeff * v) : old_falseclass_w.get()
-                        - (coeff * v);
-                weightsToSub.put(k, new FloatWritable(sub_w));
+                WeightValue old_falseclass_w = weightsToSub.get(k);
+                float sub_w = (old_falseclass_w == null) ? -(coeff * v)
+                        : old_falseclass_w.getValue() - (coeff * v);
+                weightsToSub.put(k, new WeightValue(sub_w));
             }
         }
 
         if(biasKey != null) {
-            FloatWritable old_trueclass_bias = weightsToAdd.get(biasKey);
-            float add_bias = (old_trueclass_bias == null) ? coeff * bias : old_trueclass_bias.get()
-                    + (coeff * bias);
-            weightsToAdd.put(biasKey, new FloatWritable(add_bias));
+            WeightValue old_trueclass_bias = weightsToAdd.get(biasKey);
+            float add_bias = (old_trueclass_bias == null) ? coeff * bias
+                    : old_trueclass_bias.getValue() + (coeff * bias);
+            weightsToAdd.put(biasKey, new WeightValue(add_bias));
 
             if(weightsToSub != null) {
-                FloatWritable old_falseclass_bias = weightsToSub.get(biasKey);
+                WeightValue old_falseclass_bias = weightsToSub.get(biasKey);
                 float sub_bias = (old_falseclass_bias == null) ? -(coeff * bias)
-                        : old_falseclass_bias.get() - (coeff * bias);
-                weightsToSub.put(biasKey, new FloatWritable(sub_bias));
+                        : old_falseclass_bias.getValue() - (coeff * bias);
+                weightsToSub.put(biasKey, new WeightValue(sub_bias));
             }
         }
     }
@@ -334,15 +450,16 @@ public abstract class MulticlassOnlineClassifierUDTF extends GenericUDTF {
     public void close() throws HiveException {
         if(label2FeatureWeight != null) {
             final Object[] forwardMapObj = new Object[3];
-            for(Map.Entry<Object, Map<Object, FloatWritable>> label2map : label2FeatureWeight.entrySet()) {
+            for(Map.Entry<Object, Map<Object, WeightValue>> label2map : label2FeatureWeight.entrySet()) {
                 Object label = label2map.getKey();
                 forwardMapObj[0] = label;
-                Map<Object, FloatWritable> fvmap = label2map.getValue();
-                for(Map.Entry<Object, FloatWritable> fv : fvmap.entrySet()) {
-                    Object k = fv.getKey();
-                    FloatWritable v = fv.getValue();
+                Map<Object, WeightValue> fvmap = label2map.getValue();
+                for(Map.Entry<Object, WeightValue> entry : fvmap.entrySet()) {
+                    Object k = entry.getKey();
+                    WeightValue v = entry.getValue();
+                    FloatWritable fv = new FloatWritable(v.getValue());
                     forwardMapObj[1] = k;
-                    forwardMapObj[2] = v;
+                    forwardMapObj[2] = fv;
                     forward(forwardMapObj);
                 }
             }

@@ -1,8 +1,10 @@
 Hivemall: Hive scalable machine learning library
 =================================================
 
-Hivemall is a scalable machine learning library running on Hive/Hadoop, licensed under the LGPL 2.1.  
+Hivemall is a scalable machine learning library that runs on Apache Hive, licensed under the LGPL 2.1.  
 Hivemall is designed to be scalable to the number of training instances as well as the number of training features.
+
+![logo](https://raw.github.com/myui/hivemall/master/resources/hivemall-logo_s.png "Hivemall's cute(!?) logo")
 
 Supported Algorithms
 --------------------
@@ -14,7 +16,13 @@ through UDFs/UDAFs/UDTFs of Hive.
 
 * Perceptron
 
-* Passive Aggressive (PA1, PA2)
+* Passive Aggressive (PA, PA1, PA2)
+
+* Confidence Weighted (CW)
+
+* Adaptive Regularization of Weight Vectors (AROW)
+
+* Soft Confidence Weighted (SCW1, SCW2)
 
 ## Regression
 
@@ -22,6 +30,8 @@ through UDFs/UDAFs/UDTFs of Hive.
   (parameter mixing and iterative parameter mixing)
   
 * Passive Aggressive Regression (PA1, PA2)
+
+* AROW regression
 
 ## Ensemble
 
@@ -41,10 +51,12 @@ through UDFs/UDAFs/UDTFs of Hive.
 
 * Bias clause
 
+* Data generator for one-vs-the-rest classifiers
+
 System requirements
 --------------------
 
-* Hive 0.9 or later
+* Hive 0.9 and later (Tested for v0.9 - v0.12)
 
 * Hadoop 0.20.x (CDH3 is our target)
 
@@ -73,16 +85,23 @@ On the other hand, softwares that uses the Hivemall jar package without any modi
 See GNU's [LGPL and Java page](http://www.gnu.org/licenses/lgpl-java.en.html) for detail.
 
 If you want other (commercial) licensing options, please contact me.  
+=======
+On the other hand, softwares that uses the Hivemall jar package without any modification are no need to show their sources.
+See GNU's [LGPL and Java page](http://www.gnu.org/licenses/lgpl-java.en.html) for detail.
+
+The LGPL does not require you to distribute source code of programs as far as just using/linking Hivemall in your application, so you can use Hivemall in closed-source apps and for most commercial uses.
+
+If you want other (commercial) licensing options, please contact me. 
+I and my institute are ready to provide a commercial license with an additional support contract.  
 [Makoto YUI](http://staff.aist.go.jp/m.yui/index_e.html) \<m.yui AT aist.go.jp\>
 
 Copyright
 ---------
 
 Copyright (C) 2013 National Institute of Advanced Industrial Science and Technology (AIST)  
-Registration Number: [H25PRO-1520](http://itri.aist-go.jp/section/knowledge.html)
+Registration Number: [H25PRO-1520]
 
-Put the above copyrights and the registration number for the services/softwares that use Hivemall.
-
+Put the above copyrights for the services/softwares that use Hivemall.
 
 References
 ----------

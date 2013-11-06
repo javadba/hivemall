@@ -1,14 +1,14 @@
-/**
+/*
  * Hivemall: Hive scalable Machine Learning Library
  *
  * Copyright (C) 2013
  *   National Institute of Advanced Industrial Science and Technology (AIST)
  *   Registration Number: H25PRO-1520
- *   
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -46,7 +46,6 @@ public class MulticlassPassiveAggressiveUDTF extends MulticlassOnlineClassifierU
         assert (!features.isEmpty());
 
         Margin margin = getMargin(features, actual_label);
-        Object missed_label = margin.getMaxIncorrectLabel();
         float loss = loss(margin);
 
         if(loss > 0.f) { // & missed_label != null
@@ -55,6 +54,7 @@ public class MulticlassPassiveAggressiveUDTF extends MulticlassOnlineClassifierU
                 return;
             }
             float coeff = eta(loss, sqnorm);
+            Object missed_label = margin.getMaxIncorrectLabel();
             update(features, coeff, actual_label, missed_label);
         }
     }

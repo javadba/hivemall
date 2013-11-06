@@ -1,14 +1,14 @@
-/**
+/*
  * Hivemall: Hive scalable Machine Learning Library
  *
  * Copyright (C) 2013
  *   National Institute of Advanced Industrial Science and Technology (AIST)
  *   Registration Number: H25PRO-1520
- *   
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -27,6 +27,8 @@ import org.apache.hadoop.hive.ql.exec.UDF;
 
 public class Sha1UDF extends UDF {
 
+    public static final int DEFAULT_NUM_FEATURES = 16777216;
+
     private final MessageDigest sha256;
 
     public Sha1UDF() {
@@ -39,7 +41,15 @@ public class Sha1UDF extends UDF {
     }
 
     public int evaluate(String word) {
-        return sha1(word);
+        return evaluate(word, DEFAULT_NUM_FEATURES);
+    }
+
+    public int evaluate(String word, boolean rawValue) {
+        if(rawValue) {
+            return sha1(word);
+        } else {
+            return evaluate(word, DEFAULT_NUM_FEATURES);
+        }
     }
 
     public int evaluate(String word, int numFeatures) {

@@ -1,14 +1,14 @@
-/**
+/*
  * Hivemall: Hive scalable Machine Learning Library
  *
  * Copyright (C) 2013
  *   National Institute of Advanced Industrial Science and Technology (AIST)
  *   Registration Number: H25PRO-1520
- *   
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -21,14 +21,31 @@
 package hivemall.ftvec.hashing;
 
 import org.apache.hadoop.hive.ql.exec.UDF;
+import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 
 public class MurmurHash3UDF extends UDF {
 
-    public int evaluate(String word) {
-        return murmurhash3_x86_32(word, 0, word.length(), 0x9747b28c);
+    public static final int DEFAULT_NUM_FEATURES = 16777216;
+
+    public int evaluate(String word) throws UDFArgumentException {
+        return evaluate(word, DEFAULT_NUM_FEATURES);
     }
 
-    public int evaluate(String word, int numFeatures) {
+    public int evaluate(String word, boolean rawValue) throws UDFArgumentException {
+        if(rawValue) {
+            if(word == null) {
+                throw new UDFArgumentException("argument must not be null");
+            }
+            return murmurhash3_x86_32(word, 0, word.length(), 0x9747b28c);
+        } else {
+            return evaluate(word, DEFAULT_NUM_FEATURES);
+        }
+    }
+
+    public int evaluate(String word, int numFeatures) throws UDFArgumentException {
+        if(word == null) {
+            throw new UDFArgumentException("argument must not be null");
+        }
         int r = murmurhash3_x86_32(word, 0, word.length(), 0x9747b28c) % numFeatures;
         if(r < 0) {
             r += numFeatures;
@@ -36,7 +53,10 @@ public class MurmurHash3UDF extends UDF {
         return r;
     }
 
-    public int evaluate(String... words) {
+    public int evaluate(String... words) throws UDFArgumentException {
+        if(words == null) {
+            throw new UDFArgumentException("argument must not be null");
+        }
         if(words.length == 0) {
             return 0;
         }
@@ -50,7 +70,10 @@ public class MurmurHash3UDF extends UDF {
         return evaluate(s);
     }
 
-    public int evaluate(String[] words, int numFeatures) {
+    public int evaluate(String[] words, int numFeatures) throws UDFArgumentException {
+        if(words == null) {
+            throw new UDFArgumentException("argument must not be null");
+        }
         if(words.length == 0) {
             return 0;
         }
@@ -68,7 +91,7 @@ public class MurmurHash3UDF extends UDF {
      * @return hash value of range from 0 to 2^24 (16777216).
      */
     public static int murmurhash3(final String data) {
-        return murmurhash3(data, 16777216);
+        return murmurhash3(data, DEFAULT_NUM_FEATURES);
     }
 
     public static int murmurhash3(final String data, final int numFeatures) {

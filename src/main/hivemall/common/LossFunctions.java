@@ -1,14 +1,14 @@
-/**
+/*
  * Hivemall: Hive scalable Machine Learning Library
  *
  * Copyright (C) 2013
  *   National Institute of Advanced Industrial Science and Technology (AIST)
  *   Registration Number: H25PRO-1520
- *   
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -93,8 +93,8 @@ public final class LossFunctions {
 
     public static abstract class BinaryLoss implements LossFunction {
 
-        protected void checkTarget(float y) {
-            if(y == 1.f || y == -1.f) {
+        protected static void checkTarget(float y) {
+            if(!(y == 1.f || y == -1.f)) {
                 throw new IllegalArgumentException("target must be [+1,-1]: " + y);
             }
         }
@@ -205,28 +205,14 @@ public final class LossFunctions {
 
         @Override
         public float loss(float p, float y) {
-            checkTarget(y);
-
             float loss = hingeLoss(p, y, threshold);
             return (loss > 0.f) ? loss : 0.f;
         }
 
         @Override
         public float dloss(float p, float y) {
-            checkTarget(y);
-
             float loss = hingeLoss(p, y, threshold);
             return (loss > 0.f) ? -y : 0.f;
-        }
-
-        public static float hingeLoss(float p, float y) {
-            return hingeLoss(p, y, 1.f);
-        }
-
-        public static float hingeLoss(float p, float y, float threshold) {
-            assert (y == -1.f || y == 1.f) : y;
-            float z = y * p;
-            return threshold - z;
         }
     }
 
@@ -237,11 +223,7 @@ public final class LossFunctions {
 
         @Override
         public float loss(float p, float y) {
-            checkTarget(y);
-
-            float z = y * p;
-            float d = 1.f - z;
-            return (d > 0.f) ? (d * d) : 0.f;
+            return squaredHingeLoss(p, y);
         }
 
         @Override
@@ -337,12 +319,31 @@ public final class LossFunctions {
             return 0.f;
         }
 
-        /**
-         * Math.abs(target - predicted) - epsilon
-         */
-        public static float loss(float predicted, float target, float epsilon) {
-            return Math.abs(target - predicted) - epsilon;
-        }
+    }
 
+    public static float hingeLoss(final float p, final float y, final float threshold) {
+        BinaryLoss.checkTarget(y);
+
+        float z = y * p;
+        return threshold - z;
+    }
+
+    public static float hingeLoss(float p, float y) {
+        return hingeLoss(p, y, 1.f);
+    }
+
+    public static float squaredHingeLoss(final float p, final float y) {
+        BinaryLoss.checkTarget(y);
+
+        float z = y * p;
+        float d = 1.f - z;
+        return (d > 0.f) ? (d * d) : 0.f;
+    }
+
+    /**
+     * Math.abs(target - predicted) - epsilon
+     */
+    public static float epsilonInsensitiveLoss(float predicted, float target, float epsilon) {
+        return Math.abs(target - predicted) - epsilon;
     }
 }

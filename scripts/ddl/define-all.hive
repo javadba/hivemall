@@ -25,6 +25,18 @@ create temporary function train_pa1 as 'hivemall.classifier.PassiveAggressiveUDT
 drop temporary function train_pa2;
 create temporary function train_pa2 as 'hivemall.classifier.PassiveAggressiveUDTF$PA2';
 
+drop temporary function train_cw;
+create temporary function train_cw as 'hivemall.classifier.ConfidenceWeightedUDTF';
+
+drop temporary function train_arow;
+create temporary function train_arow as 'hivemall.classifier.AROWClassifierUDTF';
+
+drop temporary function train_scw;
+create temporary function train_scw as 'hivemall.classifier.SoftConfideceWeightedUDTF$SCW1';
+
+drop temporary function train_scw2;
+create temporary function train_scw2 as 'hivemall.classifier.SoftConfideceWeightedUDTF$SCW2';
+
 --------------------------------
 --  Multiclass classification --
 -------------------------------- 
@@ -41,6 +53,18 @@ create temporary function train_multiclass_pa1 as 'hivemall.classifier.multiclas
 drop temporary function train_multiclass_pa2;
 create temporary function train_multiclass_pa2 as 'hivemall.classifier.multiclass.MulticlassPassiveAggressiveUDTF$PA2';
 
+drop temporary function train_multiclass_cw;
+create temporary function train_multiclass_cw as 'hivemall.classifier.multiclass.MulticlassConfidenceWeightedUDTF';
+
+drop temporary function train_multiclass_arow;
+create temporary function train_multiclass_arow as 'hivemall.classifier.multiclass.MulticlassAROWClassifierUDTF';
+
+drop temporary function train_multiclass_scw;
+create temporary function train_multiclass_scw as 'hivemall.classifier.multiclass.MulticlassSoftConfidenceWeightedUDTF$SCW1';
+
+drop temporary function train_multiclass_scw2;
+create temporary function train_multiclass_scw2 as 'hivemall.classifier.multiclass.MulticlassSoftConfidenceWeightedUDTF$SCW2';
+
 ----------------------
 -- voting functions --
 ----------------------
@@ -50,6 +74,10 @@ create temporary function voted_avg as 'hivemall.ensemble.bagging.VotedAvgUDAF';
 
 drop temporary function weight_voted_avg;
 create temporary function weight_voted_avg as 'hivemall.ensemble.bagging.WeightVotedAvgUDAF';
+
+-- alias of weight_voted_avg
+drop temporary function wvoted_avg;
+create temporary function wvoted_avg as 'hivemall.ensemble.bagging.WeightVotedAvgUDAF';
 
 --------------------
 -- misc functions --
@@ -73,6 +101,9 @@ create temporary function sha1 as 'hivemall.ftvec.hashing.Sha1UDF';
 
 drop temporary function array_hash_values;
 create temporary function array_hash_values as 'hivemall.ftvec.hashing.ArrayHashValuesUDF';
+
+drop temporary function prefixed_hash_values;
+create temporary function prefixed_hash_values as 'hivemall.ftvec.hashing.ArrayPrefixedHashValuesUDF';
 
 -----------------------
 -- scaling functions --
@@ -124,6 +155,12 @@ create temporary function pa2_regress as 'hivemall.regression.PassiveAggressiveR
 
 drop temporary function pa2a_regress;
 create temporary function pa2a_regress as 'hivemall.regression.PassiveAggressiveRegressionUDTF$PA2a';
+
+drop temporary function arow_regress;
+create temporary function arow_regress as 'hivemall.regression.AROWRegressionUDTF';
+
+drop temporary function arowh_regress;
+create temporary function arowh_regress as 'hivemall.regression.AROWRegressionUDTF$AROWh';
 
 ---------------------
 -- array functions --

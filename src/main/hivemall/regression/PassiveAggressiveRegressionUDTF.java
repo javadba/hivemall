@@ -1,14 +1,14 @@
-/**
+/*
  * Hivemall: Hive scalable Machine Learning Library
  *
  * Copyright (C) 2013
  *   National Institute of Advanced Industrial Science and Technology (AIST)
  *   Registration Number: H25PRO-1520
- *   
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -20,19 +20,17 @@
  */
 package hivemall.regression;
 
-import hivemall.common.LossFunctions.EpsilonInsensitiveLoss;
+import hivemall.common.LossFunctions;
 import hivemall.common.OnlineVariance;
 import hivemall.common.PredictionResult;
 
 import java.util.Collection;
-import java.util.Map;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
-import org.apache.hadoop.io.FloatWritable;
 
 public class PassiveAggressiveRegressionUDTF extends OnlineRegressionUDTF {
 
@@ -57,7 +55,7 @@ public class PassiveAggressiveRegressionUDTF extends OnlineRegressionUDTF {
     protected Options getOptions() {
         Options opts = super.getOptions();
         opts.addOption("c", "aggressiveness", true, "Aggressiveness paramete [default Float.MAX_VALUE]");
-        opts.addOption("epsilon", true, "Sensitivity to prediction mistakes [default 0.1].");
+        opts.addOption("e", "epsilon", true, "Sensitivity to prediction mistakes [default 0.1]");
         return opts;
     }
 
@@ -93,8 +91,10 @@ public class PassiveAggressiveRegressionUDTF extends OnlineRegressionUDTF {
     }
 
     @Override
-    protected void train(Map<Object, FloatWritable> weights, Collection<?> features, float target) {
-        PredictionResult margin = calcScore(features);
+    protected void train(Collection<?> features, float target) {
+        preTrain(target);
+
+        PredictionResult margin = calcScoreAndNorm(features);
         float predicted = margin.getScore();
         float loss = loss(target, predicted);
 
@@ -108,12 +108,13 @@ public class PassiveAggressiveRegressionUDTF extends OnlineRegressionUDTF {
         }
     }
 
+    protected void preTrain(float target) {}
+
     /** 
      * |w^t - y| - epsilon 
      */
     protected float loss(float target, float predicted) {
-        //return Math.abs(target - predicted) - epsilon;
-        return EpsilonInsensitiveLoss.loss(predicted, target, epsilon);
+        return LossFunctions.epsilonInsensitiveLoss(predicted, target, epsilon);
     }
 
     /**
@@ -127,21 +128,25 @@ public class PassiveAggressiveRegressionUDTF extends OnlineRegressionUDTF {
 
     public static class PA1a extends PassiveAggressiveRegressionUDTF {
 
-        private OnlineVariance target_stddev;
+        private OnlineVariance targetStdDev;
 
         @Override
         public StructObjectInspector initialize(ObjectInspector[] argOIs)
                 throws UDFArgumentException {
-            this.target_stddev = new OnlineVariance();
+            this.targetStdDev = new OnlineVariance();
             return super.initialize(argOIs);
         }
 
         @Override
+        protected void preTrain(float target) {
+            targetStdDev.handle(target);
+        }
+
+        @Override
         protected float loss(float target, float predicted) {
-            float stddev = (float) target_stddev.stddev();
-            //return Math.abs(target - predicted) - (epsilon * stddev);
+            float stddev = (float) targetStdDev.stddev();
             float e = epsilon * stddev;
-            return EpsilonInsensitiveLoss.loss(predicted, target, e);
+            return LossFunctions.epsilonInsensitiveLoss(predicted, target, e);
         }
 
     }
@@ -164,21 +169,25 @@ public class PassiveAggressiveRegressionUDTF extends OnlineRegressionUDTF {
 
     public static class PA2a extends PA2 {
 
-        private OnlineVariance target_stddev;
+        private OnlineVariance targetStdDev;
 
         @Override
         public StructObjectInspector initialize(ObjectInspector[] argOIs)
                 throws UDFArgumentException {
-            this.target_stddev = new OnlineVariance();
+            this.targetStdDev = new OnlineVariance();
             return super.initialize(argOIs);
         }
 
         @Override
+        protected void preTrain(float target) {
+            targetStdDev.handle(target);
+        }
+
+        @Override
         protected float loss(float target, float predicted) {
-            float stddev = (float) target_stddev.stddev();
-            //return Math.abs(target - predicted) - (epsilon * stddev);
+            float stddev = (float) targetStdDev.stddev();
             float e = epsilon * stddev;
-            return EpsilonInsensitiveLoss.loss(predicted, target, e);
+            return LossFunctions.epsilonInsensitiveLoss(predicted, target, e);
         }
 
     }

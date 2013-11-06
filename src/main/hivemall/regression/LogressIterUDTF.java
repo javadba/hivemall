@@ -1,14 +1,14 @@
-/**
+/*
  * Hivemall: Hive scalable Machine Learning Library
  *
  * Copyright (C) 2013
  *   National Institute of Advanced Industrial Science and Technology (AIST)
  *   Registration Number: H25PRO-1520
- *   
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -21,6 +21,7 @@
 package hivemall.regression;
 
 import hivemall.common.HivemallConstants;
+import hivemall.common.WeightValue;
 
 import java.util.Map;
 import java.util.Set;
@@ -81,12 +82,13 @@ public class LogressIterUDTF extends LogressUDTF {
             Object k = e.getKey();
             Object feature = ObjectInspectorUtils.copyToStandardObject(k, featureInspector);
             if(!weights.containsKey(feature)) {
-                weights.put(feature, weight);
+                float v = weight.get();
+                weights.put(feature, new WeightValue(v));
             }
         }
 
         Set<Object> features = featuresWithWeight.keySet();
-        train(weights, features, target);
+        train(features, target);
         count++;
     }
 
